@@ -3,7 +3,7 @@ mod gist;
 use age::armor::{ArmoredReader, ArmoredWriter, Format};
 use age::secrecy::SecretString;
 use anyhow::{Context, Result, bail};
-use clap::Parser;
+use clap::{ArgAction, Parser, Subcommand};
 use std::fs::{self, File};
 use std::io::{self, BufReader, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
@@ -18,9 +18,36 @@ const MAX_PARTS: usize = 298;
 const AUP_URL: &str =
     "https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies";
 
+const VERSION: &str = concat!(
+    env!("CARGO_PKG_VERSION"),
+    "\ncommit:  ",
+    env!("FOG_GIT_SHA"),
+    "\nbuilt:   ",
+    env!("FOG_BUILD_DATE"),
+    "\ntarget:  ",
+    env!("FOG_TARGET"),
+    "\nprofile: ",
+    env!("FOG_PROFILE"),
+    "\nrustc:   ",
+    env!("FOG_RUSTC"),
+);
+
 #[derive(Parser)]
-#[command(about = "Send files through encrypted secret GitHub gists")]
-enum Cli {
+#[command(
+    about = "Send files through encrypted secret GitHub gists",
+    version = VERSION,
+    disable_version_flag = true
+)]
+struct Cli {
+    /// Print version and build information.
+    #[arg(short = 'v', long = "version", action = ArgAction::Version)]
+    version: (),
+    #[command(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(Subcommand)]
+enum Cmd {
     /// Encrypt and upload a file; prints the gist URL and passcode.
     Send {
         path: PathBuf,
@@ -48,8 +75,8 @@ enum Cli {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     confirm_aup()?;
-    match cli {
-        Cli::Send {
+    match cli.cmd {
+        Cmd::Send {
             path,
             passcode,
             chunk_size,
@@ -63,12 +90,12 @@ fn main() -> Result<()> {
             };
             send(&path, passcode, chunk_size, max_parts)
         }
-        Cli::Recv {
+        Cmd::Recv {
             gist,
             passcode,
             out,
         } => recv(gist::parse_id(&gist), passcode, out),
-        Cli::Rm { gist } => gist::Gist::new(true)?.delete(gist::parse_id(&gist)),
+        Cmd::Rm { gist } => gist::Gist::new(true)?.delete(gist::parse_id(&gist)),
     }
 }
 

@@ -1,0 +1,191 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without the v prefix, for example 0.2.0. It must equal the version in Cargo.toml."
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate version
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::'$VERSION' is not a semver version (no v prefix)"; exit 1
+          fi
+          cargo_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n1)
+          if [[ "$cargo_version" != "$VERSION" ]]; then
+            echo "::error::Cargo.toml has version $cargo_version; bump it to $VERSION and commit first"; exit 1
+          fi
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::release v$VERSION already exists"; exit 1
+          fi
+
+  build:
+    needs: check
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-24.04 }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm }
+          - { target: x86_64-apple-darwin, os: macos-15 }
+          - { target: aarch64-apple-darwin, os: macos-15 }
+          - { target: x86_64-pc-windows-msvc, os: windows-2025 }
+          - { target: aarch64-pc-windows-msvc, os: windows-11-arm }
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install rustup if the runner image has none
+        run: |
+          command -v rustup >/dev/null && exit 0
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            curl -sSfL -o rustup-init.exe https://static.rust-lang.org/rustup/dist/aarch64-pc-windows-msvc/rustup-init.exe
+            ./rustup-init.exe -y --profile minimal --default-toolchain none
+            printf '%s\n' "$USERPROFILE\\.cargo\\bin" >> "$GITHUB_PATH"
+          else
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+      - if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Build
+        env:
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          rustup toolchain install stable --profile minimal --target "$TARGET"
+          # Reproducible build date in `fog -v`: the commit time.
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          export SOURCE_DATE_EPOCH
+          cargo +stable build --release --locked --target "$TARGET"
+          ext=""
+          [[ "$TARGET" == *windows* ]] && ext=.exe
+          mkdir dist
+          cp "target/$TARGET/release/fog$ext" "dist/fog-$VERSION-$TARGET$ext"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fog-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      issues: read
+      id-token: write # Sigstore signing certificate for the attestation
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum fog-* > SHA256SUMS
+          cat SHA256SUMS
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
+      - name: Create release
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cd dist
+
+          # Issues closed as completed since the previous release.
+          since=$(gh release list --limit 1 --exclude-drafts --json publishedAt --jq '.[0].publishedAt // empty')
+          query="is:issue reason:completed${since:+ closed:>$since}"
+          issues=$(gh issue list --state closed --search "$query" --limit 500 \
+            --json number,title --jq '.[] | "- \(.title) (#\(.number))"')
+
+          f="fog-$VERSION"
+          cat > ../notes.md <<EOF
+          ## Closed issues
+
+          ${issues:-None.}
+
+          ## Downloads
+
+          | Platform | File |
+          |---|---|
+          | Linux x86_64 (static) | \`$f-x86_64-unknown-linux-musl\` |
+          | Linux arm64 (static) | \`$f-aarch64-unknown-linux-musl\` |
+          | macOS Intel | \`$f-x86_64-apple-darwin\` |
+          | macOS Apple silicon | \`$f-aarch64-apple-darwin\` |
+          | Windows x86_64 | \`$f-x86_64-pc-windows-msvc.exe\` |
+          | Windows arm64 | \`$f-aarch64-pc-windows-msvc.exe\` |
+
+          ## Verify the download
+
+          Download \`SHA256SUMS\` and your binary into the same directory, then:
+
+          Linux:
+          \`\`\`sh
+          grep $f-x86_64-unknown-linux-musl SHA256SUMS | sha256sum --check
+          \`\`\`
+
+          macOS:
+          \`\`\`sh
+          grep $f-aarch64-apple-darwin SHA256SUMS | shasum -a 256 --check
+          \`\`\`
+
+          Windows (PowerShell):
+          \`\`\`powershell
+          \$f = "$f-x86_64-pc-windows-msvc.exe"
+          if ((Select-String -Path SHA256SUMS -Pattern \$f).Line -match (Get-FileHash \$f -Algorithm SHA256).Hash) { "OK" } else { "MISMATCH" }
+          \`\`\`
+
+          The expected output is \`OK\`. Change the file name for your platform.
+
+          A matching checksum shows that the download is not damaged. To also
+          prove that this repository's release workflow built the binary, verify
+          its signed build provenance with the [GitHub CLI](https://cli.github.com):
+
+          \`\`\`sh
+          gh attestation verify $f-x86_64-unknown-linux-musl --repo $GITHUB_REPOSITORY
+          \`\`\`
+
+          On Linux and macOS, make the binary executable: \`chmod +x $f-*\`.
+          On macOS, a browser download is quarantined; clear it with \`xattr -d com.apple.quarantine $f-*\`.
+          EOF
+
+          gh release create "v$VERSION" ./* \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes-file ../notes.md \
+            --generate-notes
