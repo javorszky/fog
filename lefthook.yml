@@ -1,0 +1,11 @@
+# Git hooks. Install with `make hooks`. Tools come from mise.toml.
+pre-commit:
+  parallel: true
+  jobs:
+    - name: lint
+      run: make lint
+    - name: test
+      run: make test
+    # Offline: fast and needs no token. CI runs the online audits.
+    - name: zizmor
+      run: mise exec -- zizmor --offline --quiet .github
