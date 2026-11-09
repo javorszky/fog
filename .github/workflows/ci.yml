@@ -11,7 +11,7 @@ permissions: {}
 
 jobs:
   lint-test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -22,7 +22,7 @@ jobs:
       - run: make CARGO=cargo lint test
 
   zizmor:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       security-events: write
@@ -36,7 +36,7 @@ jobs:
           advanced-security: ${{ !github.event.pull_request.head.repo.fork }}
 
   trivy:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       security-events: write
@@ -46,6 +46,7 @@ jobs:
           persist-credentials: false
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2 # the action's default Trivy is older
           scan-type: fs
           scanners: vuln
           format: sarif

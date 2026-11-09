@@ -1,12 +1,8 @@
 name: Release
 
 on:
+  # The version comes from Cargo.toml.
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version without the v prefix, for example 0.2.0. It must equal the version in Cargo.toml."
-        required: true
-        type: string
 
 permissions: {}
 
@@ -17,29 +13,31 @@ concurrency:
 jobs:
   check:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Validate version
+      - name: Read and check version
+        id: version
         env:
-          VERSION: ${{ inputs.version }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
-            echo "::error::'$VERSION' is not a semver version (no v prefix)"; exit 1
+          # --locked also fails when Cargo.lock does not match Cargo.toml.
+          if ! meta=$(cargo metadata --locked --format-version 1); then
+            echo "::error::Cargo.lock is out of date; run cargo build and commit Cargo.lock"; exit 1
           fi
-          cargo_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n1)
-          if [[ "$cargo_version" != "$VERSION" ]]; then
-            echo "::error::Cargo.toml has version $cargo_version; bump it to $VERSION and commit first"; exit 1
+          version=$(jq -r '.resolve.root as $root | .packages[] | select(.id == $root) | .version' <<<"$meta")
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "::error::release v$version already exists; bump the version in Cargo.toml"; exit 1
           fi
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
-            echo "::error::release v$VERSION already exists"; exit 1
-          fi
+          echo "Releasing v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
   build:
     needs: check
@@ -47,10 +45,10 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - { target: x86_64-unknown-linux-musl, os: ubuntu-24.04 }
-          - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm }
-          - { target: x86_64-apple-darwin, os: macos-15 }
-          - { target: aarch64-apple-darwin, os: macos-15 }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-26.04 }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-26.04-arm }
+          - { target: x86_64-apple-darwin, os: macos-26 }
+          - { target: aarch64-apple-darwin, os: macos-26 }
           - { target: x86_64-pc-windows-msvc, os: windows-2025 }
           - { target: aarch64-pc-windows-msvc, os: windows-11-arm }
     runs-on: ${{ matrix.os }}
@@ -79,7 +77,7 @@ jobs:
       - name: Build
         env:
           TARGET: ${{ matrix.target }}
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.check.outputs.version }}
         run: |
           rustup toolchain install stable --profile minimal --target "$TARGET"
           # Reproducible build date in `fog -v`: the commit time.
@@ -97,8 +95,8 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
-    runs-on: ubuntu-24.04
+    needs: [check, build]
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       issues: read
@@ -121,7 +119,7 @@ jobs:
           subject-checksums: dist/SHA256SUMS
       - name: Create release
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.check.outputs.version }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
