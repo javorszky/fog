@@ -10,8 +10,13 @@ use std::path::{Path, PathBuf};
 
 /// raw_url serves up to 10 MB per file; stay below it.
 const DEFAULT_CHUNK: usize = 8 * 1024 * 1024;
+const MAX_CHUNK: usize = 10_000_000;
+/// Default cap: 6 parts, about 35 MiB of input at the default chunk size.
+const DEFAULT_MAX_PARTS: usize = 6;
 /// API lists at most 300 files; leave room for fog.json and name.age.
 const MAX_PARTS: usize = 298;
+const AUP_URL: &str =
+    "https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies";
 
 #[derive(Parser)]
 #[command(about = "Send files through encrypted secret GitHub gists")]
@@ -24,6 +29,9 @@ enum Cli {
         /// Bytes of armored text per gist file.
         #[arg(long, default_value_t = DEFAULT_CHUNK)]
         chunk_size: usize,
+        /// Raise the part limit from 6 to 298.
+        #[arg(long)]
+        unlock_unlimited_power: bool,
     },
     /// Download and decrypt a file from a gist URL or id.
     Recv {
@@ -38,12 +46,23 @@ enum Cli {
 }
 
 fn main() -> Result<()> {
-    match Cli::parse() {
+    let cli = Cli::parse();
+    confirm_aup()?;
+    match cli {
         Cli::Send {
             path,
             passcode,
             chunk_size,
-        } => send(&path, passcode, chunk_size),
+            unlock_unlimited_power,
+        } => {
+            let max_parts = if unlock_unlimited_power {
+                eprintln!("UNLIMITED POWER unlocked.\n*limits apply");
+                MAX_PARTS
+            } else {
+                DEFAULT_MAX_PARTS
+            };
+            send(&path, passcode, chunk_size, max_parts)
+        }
         Cli::Recv {
             gist,
             passcode,
@@ -53,17 +72,35 @@ fn main() -> Result<()> {
     }
 }
 
-fn send(path: &Path, passcode: Option<String>, chunk: usize) -> Result<()> {
-    if chunk < 1024 {
-        bail!("--chunk-size must be at least 1024");
+/// Every run needs an explicit yes before it does anything.
+fn confirm_aup() -> Result<()> {
+    eprintln!(
+        "WARNING: GitHub Acceptable Use Policies do not permit gists as a file-hosting service.\n\
+         Use fog only for small, occasional transfers.\n{AUP_URL}"
+    );
+    eprint!("Is this an occasional transfer? [y/N] ");
+    let mut answer = String::new();
+    io::stdin().read_line(&mut answer)?;
+    if !matches!(answer.trim().to_lowercase().as_str(), "y" | "yes") {
+        bail!("not confirmed; nothing was done");
+    }
+    Ok(())
+}
+
+fn send(path: &Path, passcode: Option<String>, chunk: usize, max_parts: usize) -> Result<()> {
+    if !(1024..=MAX_CHUNK).contains(&chunk) {
+        bail!("--chunk-size must be between 1024 and {MAX_CHUNK} (gist raw URL limit)");
     }
     let size = fs::metadata(path)?.len() as usize;
     // armor: base64 (4/3) plus one newline per 64 chars, plus header/footer slack
     let parts = (size / 3 * 4 * 65 / 64 + 4096).div_ceil(chunk);
-    if parts > MAX_PARTS {
-        bail!(
-            "file needs ~{parts} parts, max is {MAX_PARTS}; raise --chunk-size or split the file"
-        );
+    if parts > max_parts {
+        let hint = if max_parts < MAX_PARTS {
+            "use --unlock-unlimited-power"
+        } else {
+            "split the file"
+        };
+        bail!("file needs ~{parts} parts, max is {max_parts}; {hint}");
     }
     let name = path
         .file_name()
