@@ -3,9 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>fog — ftp over gist</title>
-<meta name="description" content="Send an encrypted file to another person through a secret GitHub gist. The receiver needs only the link and the passcode.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌫️</text></svg>">
+<title>fog — send an encrypted file through a GitHub gist</title>
+<meta name="description" content="fog is a small CLI that encrypts a file with a passcode and sends it through a secret GitHub gist. The receiver needs only the link and the passcode, no GitHub account.">
+<link rel="canonical" href="https://fog.j7y.co/">
+<meta name="theme-color" content="#3d1dff">
+<meta name="color-scheme" content="dark light">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="fog">
+<meta property="og:url" content="https://fog.j7y.co/">
+<meta property="og:title" content="fog — send a file through a gist">
+<meta property="og:description" content="Encrypt a file with a passcode and send it through a secret GitHub gist. The receiver needs only the link and the passcode.">
+<meta property="og:image" content="https://fog.j7y.co/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="fog: send a file through a gist. $ fog send ./report.pdf">
+<meta property="og:locale" content="en_GB">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="fog — send a file through a gist">
+<meta name="twitter:description" content="Encrypt a file with a passcode and send it through a secret GitHub gist. The receiver needs only the link and the passcode.">
+<meta name="twitter:image" content="https://fog.j7y.co/og.png">
+<meta name="twitter:image:alt" content="fog: send a file through a gist. $ fog send ./report.pdf">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root {
     --hero: #3d1dff; --pink: #ff2e88; --lime: #c8ff1a; --cyan: #00e0ff; --ink: #0c0a24;
