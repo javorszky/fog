@@ -103,8 +103,14 @@ breaks add approximately 1.5%. Thus, 6 parts of 8 MiB hold approximately
    Output goes to `<name>.fog-partial` and fog renames it only after the
    decryption is complete and correct.
 
-A secret gist is not private. Any person who has the URL can download the
-encrypted data. The passcode is the only protection, so use a strong passcode.
+A secret gist is not private. Anyone with the URL can download the encrypted
+file. The passcode is the only protection, so use a strong passcode.
+
+> **Do not use fog for real secrets.** Anyone with the URL can keep a copy of
+> the encrypted file. Deleting the gist does not delete that copy. Copies can
+> also stay in places you do not control: the Internet Archive, browser caches,
+> proxies and CDNs. If someone gets the passcode later, or if future computers
+> can break the encryption, they can open the copy.
 
 ## Development
 
