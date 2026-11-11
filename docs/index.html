@@ -67,9 +67,18 @@
   h2 { font-size: clamp(36px, 6vw, 56px); font-weight: 900; text-transform: uppercase; letter-spacing: -0.03em; margin: 0 0 28px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
   .card { border-radius: 16px; padding: 24px; color: var(--ink); border: 3px solid var(--ink); }
-  .card:nth-child(1) { background: var(--pink); }
-  .card:nth-child(2) { background: var(--lime); }
-  .card:nth-child(3) { background: var(--cyan); }
+  .card:nth-child(1) { background: var(--lime); }
+  .card:nth-child(2) { background: var(--cyan); }
+  .card:nth-child(3) { background: #fff; }
+
+  /* Full-bleed colour bands: same in light and dark mode, always dark text. */
+  .band { color: var(--ink); --line: var(--ink); --accent: var(--ink); --warn: var(--ink); }
+  .band.pink { background: var(--pink); }
+  .band.lime { background: var(--lime); }
+  .band .small { color: var(--ink); }
+  .band.lime .term { box-shadow: 10px 10px 0 var(--pink); }
+  .band .downloads a { border-color: var(--ink); color: var(--ink); }
+  .band .downloads a:hover { background: var(--ink); color: var(--lime); }
   .card a { color: inherit; }
   .card h3 { margin: 0 0 8px; font-size: 22px; font-weight: 800; }
   .card p { margin: 0; }
@@ -131,8 +140,8 @@ wrote report.pdf
   </div>
 </header>
 
-<main class="wrap">
-  <section id="how">
+<main>
+  <section id="how" class="band pink"><div class="wrap">
     <h2>How it works</h2>
     <div class="grid">
       <div class="card"><div class="n">01</div><h3>Encrypt</h3>
@@ -144,9 +153,9 @@ wrote report.pdf
     </div>
     <p class="note" style="margin-top:24px">A secret gist is not private. Any person with the URL can download the encrypted data.
       The passcode is the only protection. Send the URL and the passcode on different channels.</p>
-  </section>
+  </div></section>
 
-  <section id="install">
+  <section id="install" class="band lime"><div class="wrap">
     <h2>Install</h2>
     <p>Static binaries for Linux, macOS and Windows on x86_64 and arm64.
       Each release has a <code>SHA256SUMS</code> file and a signed build provenance attestation.</p>
@@ -161,9 +170,9 @@ wrote report.pdf
     <p class="small">To send, fog needs a GitHub token: <code>GITHUB_TOKEN</code>, or <code>gh auth login</code>.
       To receive, no token is necessary. On macOS, a downloaded binary may need
       <code>xattr -d com.apple.quarantine fog</code>.</p>
-  </section>
+  </div></section>
 
-  <section id="limits">
+  <section id="limits"><div class="wrap">
     <h2>Limits</h2>
     <div class="tablewrap"><table>
       <tr><th>Limit</th><th>Value</th></tr>
@@ -175,7 +184,7 @@ wrote report.pdf
     <p class="note" style="margin-top:24px">GitHub
       <a href="https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies">Acceptable Use Policies</a>
       do not permit gists as a file-hosting service. Use fog only for small, occasional transfers.</p>
-  </section>
+  </div></section>
 </main>
 
 <footer>
