@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fog — ftp over gist</title>
+<meta name="description" content="Send an encrypted file to another person through a secret GitHub gist. The receiver needs only the link and the passcode.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌫️</text></svg>">
+<style>
+  :root {
+    --hero: #3d1dff; --pink: #ff2e88; --lime: #c8ff1a; --cyan: #00e0ff; --ink: #0c0a24;
+    --bg: #0c0a24; --bg2: #18144a; --fg: #ffffff; --muted: #b8b3f0;
+    --line: #2f2878; --accent: #ff2e88; --warn: #c8ff1a;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #ffffff; --bg2: #ffffff; --fg: #0c0a24; --muted: #4b4680;
+      --line: #0c0a24; --accent: #d4005f; --warn: #ff2e88;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 17px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; }
+  nav .brand { font: 800 22px var(--mono); color: #fff; text-decoration: none; }
+  nav .links a { margin-left: 20px; color: #fff; font-weight: 600; text-decoration: none; }
+  nav .links a:hover { color: var(--lime); }
+
+  .hero {
+    color: #fff; padding-bottom: 72px;
+    background: var(--hero);
+  }
+  .hero .inner { padding-top: 56px; }
+  h1 {
+    font-size: clamp(44px, 10vw, 104px); line-height: .92; letter-spacing: -0.04em;
+    font-weight: 900; text-transform: uppercase; margin: 0 0 24px;
+  }
+  h1 span { color: var(--lime); }
+  .lede { font-size: 21px; max-width: 34em; margin: 0 0 32px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn {
+    display: inline-block; padding: 14px 26px; border-radius: 999px; font-weight: 800;
+    text-decoration: none; border: 3px solid #fff; color: #fff;
+  }
+  .btn.primary { background: var(--lime); color: var(--ink); border-color: var(--ink); box-shadow: 5px 5px 0 var(--ink); }
+  .btn:hover { transform: translate(-2px, -2px); }
+  .btn.primary:hover { box-shadow: 7px 7px 0 var(--ink); }
+  .small { font-size: 14px; color: var(--muted); }
+  .hero .small { color: #fff; font: 700 14px var(--mono); }
+
+  pre, code { font-family: var(--mono); }
+  .term {
+    background: var(--ink); color: #fff; border: 3px solid var(--ink); border-radius: 16px;
+    margin-top: 48px; overflow: hidden; box-shadow: 10px 10px 0 var(--lime);
+  }
+  .term .bar { padding: 10px 14px; background: var(--pink); font: 700 13px var(--mono); color: var(--ink); }
+  .term pre { margin: 0; padding: 18px; overflow-x: auto; font-size: 14px; line-height: 1.7; }
+  .term .p { color: var(--lime); user-select: none; }
+  .term .c { color: #8f88d8; }
+
+  section { padding: 72px 0; }
+  h2 { font-size: clamp(36px, 6vw, 56px); font-weight: 900; text-transform: uppercase; letter-spacing: -0.03em; margin: 0 0 28px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+  .card { border-radius: 16px; padding: 24px; color: var(--ink); border: 3px solid var(--ink); }
+  .card:nth-child(1) { background: var(--pink); }
+  .card:nth-child(2) { background: var(--lime); }
+  .card:nth-child(3) { background: var(--cyan); }
+  .card a { color: inherit; }
+  .card h3 { margin: 0 0 8px; font-size: 22px; font-weight: 800; }
+  .card p { margin: 0; }
+  .card .n { font: 900 40px/1 var(--mono); margin-bottom: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 16px; }
+  th, td { text-align: left; padding: 12px 8px; border-bottom: 2px solid var(--line); vertical-align: top; }
+  th { color: var(--accent); font-weight: 800; text-transform: uppercase; font-size: 13px; letter-spacing: .08em; }
+  .tablewrap { overflow-x: auto; }
+
+  .downloads { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin: 20px 0; }
+  .downloads a {
+    display: block; padding: 12px 16px; border: 3px solid var(--hero); border-radius: 10px;
+    font: 600 14px var(--mono); color: var(--fg); text-decoration: none; overflow-wrap: anywhere;
+  }
+  .downloads a:hover { background: var(--hero); color: #fff; }
+  .note { border-left: 6px solid var(--warn); padding: 4px 0 4px 16px; font-weight: 500; }
+  footer { padding: 32px 0 48px; background: var(--hero); color: #fff; font-weight: 600; }
+  footer a { color: var(--lime); }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+  <nav>
+    <a class="brand" href="#">fog</a>
+    <div class="links">
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/javorszky/fog">GitHub</a>
+    </div>
+  </nav>
+  </div>
+  <div class="wrap inner">
+    <h1>Send a file<br><span>through a gist.</span></h1>
+    <p class="lede">fog encrypts a file with a passcode and uploads it to a secret GitHub gist.
+      The receiver needs the link and the passcode. No GitHub account to receive.</p>
+    <div class="cta">
+      <a class="btn primary" id="dl" href="https://github.com/javorszky/fog/releases/latest">Download fog</a>
+      <a class="btn" href="#install">Other platforms</a>
+      <span class="small" id="ver"></span>
+    </div>
+
+    <div class="term">
+      <div class="bar">terminal</div>
+<pre><span class="c"># sender</span>
+<span class="p">$ </span>fog send ./report.pdf
+https://gist.github.com/you/3f9c…
+passcode: <span class="c">(24 random characters)</span>
+
+<span class="c"># receiver — no token needed</span>
+<span class="p">$ </span>fog recv https://gist.github.com/you/3f9c…
+passcode: ••••••••
+wrote report.pdf
+
+<span class="c"># sender, after the receiver has the file</span>
+<span class="p">$ </span>fog rm https://gist.github.com/you/3f9c…</pre>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="how">
+    <h2>How it works</h2>
+    <div class="grid">
+      <div class="card"><div class="n">01</div><h3>Encrypt</h3>
+        <p><a href="https://age-encryption.org">age</a> encrypts the file with your passcode (scrypt). The file name is encrypted too.</p></div>
+      <div class="card"><div class="n">02</div><h3>Split and upload</h3>
+        <p>The armored text goes into parts in one secret gist. <code>fog.json</code> is written last, so a partial upload is easy to see.</p></div>
+      <div class="card"><div class="n">03</div><h3>Download and decrypt</h3>
+        <p>One API call lists the parts. fog downloads them from raw URLs and decrypts as a stream. A wrong passcode stops it before the download.</p></div>
+    </div>
+    <p class="note" style="margin-top:24px">A secret gist is not private. Any person with the URL can download the encrypted data.
+      The passcode is the only protection. Send the URL and the passcode on different channels.</p>
+  </section>
+
+  <section id="install">
+    <h2>Install</h2>
+    <p>Static binaries for Linux, macOS and Windows on x86_64 and arm64.
+      Each release has a <code>SHA256SUMS</code> file and a signed build provenance attestation.</p>
+    <div class="downloads" id="assets">
+      <a href="https://github.com/javorszky/fog/releases/latest">All downloads on the releases page →</a>
+    </div>
+    <div class="term" style="margin-top:24px">
+      <div class="bar">macOS / Linux</div>
+<pre><span class="p">$ </span>chmod +x fog-*  &amp;&amp;  mv fog-* /usr/local/bin/fog
+<span class="p">$ </span>gh attestation verify /usr/local/bin/fog --repo javorszky/fog</pre>
+    </div>
+    <p class="small">To send, fog needs a GitHub token: <code>GITHUB_TOKEN</code>, or <code>gh auth login</code>.
+      To receive, no token is necessary. On macOS, a downloaded binary may need
+      <code>xattr -d com.apple.quarantine fog</code>.</p>
+  </section>
+
+  <section id="limits">
+    <h2>Limits</h2>
+    <div class="tablewrap"><table>
+      <tr><th>Limit</th><th>Value</th></tr>
+      <tr><td>Size per transfer (default)</td><td>about 35 MiB (6 parts)</td></tr>
+      <tr><td>With <code>--unlock-unlimited-power</code></td><td>about 1.7 GiB (298 parts)</td></tr>
+      <tr><td>Uploads</td><td>80 per minute, 500 per hour (GitHub limit)</td></tr>
+      <tr><td>Receives</td><td>60 per hour per IP address (GitHub limit)</td></tr>
+    </table></div>
+    <p class="note" style="margin-top:24px">GitHub
+      <a href="https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies">Acceptable Use Policies</a>
+      do not permit gists as a file-hosting service. Use fog only for small, occasional transfers.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">fog · <a href="https://github.com/javorszky/fog">source</a> · <a href="https://github.com/javorszky/fog/releases">releases</a></div>
+</footer>
+
+<script>
+  // Asset names contain the version, so ask the API for the latest release.
+  // On failure (rate limit, offline) the links stay on the releases page.
+  const LABELS = {
+    'aarch64-apple-darwin': 'macOS · Apple silicon',
+    'x86_64-apple-darwin': 'macOS · Intel',
+    'x86_64-unknown-linux-musl': 'Linux · x86_64',
+    'aarch64-unknown-linux-musl': 'Linux · arm64',
+    'x86_64-pc-windows-msvc': 'Windows · x86_64',
+    'aarch64-pc-windows-msvc': 'Windows · arm64',
+  };
+  const ua = navigator.userAgent;
+  // ponytail: Intel vs Apple silicon is not detectable from UA; Apple silicon is the default.
+  const guess = /Mac/.test(ua) ? 'aarch64-apple-darwin'
+    : /Win/.test(ua) ? 'x86_64-pc-windows-msvc'
+    : /Linux/.test(ua) && !/Android/.test(ua) ? 'x86_64-unknown-linux-musl' : null;
+
+  fetch('https://api.github.com/repos/javorszky/fog/releases/latest')
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(rel => {
+      document.getElementById('ver').textContent = rel.tag_name;
+      const list = document.getElementById('assets');
+      for (const a of rel.assets) {
+        const target = Object.keys(LABELS).find(t => a.name.includes(t));
+        const link = document.createElement('a');
+        link.href = a.browser_download_url;
+        link.textContent = target ? `${LABELS[target]} — ${a.name}` : a.name;
+        list.insertBefore(link, list.lastElementChild);
+        if (target && target === guess) {
+          const dl = document.getElementById('dl');
+          dl.href = a.browser_download_url;
+          dl.textContent = `Download for ${LABELS[target]}`;
+        }
+      }
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>
