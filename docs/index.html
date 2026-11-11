@@ -173,8 +173,12 @@ wrote report.pdf
       <div class="card"><div class="n">03</div><h3>Download and decrypt</h3>
         <p>One API call lists the parts. fog downloads them from raw URLs and decrypts as a stream. A wrong passcode stops it before the download.</p></div>
     </div>
-    <p class="note" style="margin-top:24px">A secret gist is not private. Any person with the URL can download the encrypted data.
+    <p class="note" style="margin-top:24px">A secret gist is not private. Anyone with the URL can download the encrypted file.
       The passcode is the only protection. Send the URL and the passcode on different channels.</p>
+    <p class="note"><strong>Do not use fog for real secrets.</strong>
+      Anyone with the URL can keep a copy of the encrypted file. Deleting the gist does not delete that copy.
+      Copies can also stay in places you do not control: the Internet Archive, browser caches, proxies and CDNs.
+      If someone gets the passcode later, or if future computers can break the encryption, they can open the copy.</p>
   </div></section>
 
   <section id="install" class="band lime"><div class="wrap">
